@@ -7,11 +7,13 @@ A Kubernetes cluster is already configured. You must connect to the **correct co
 
 **Task:**
 
-A web application is running in the namespace `external`. Deploy an nginx-based application and expose it via a Service `nginx-service` on port `8080`.
+A web application is running in the namespace `external`. Deployed an nginx-based application and expose it via a Service `nginx-service` on port `8080`.
 
 Create an Ingress resource named `external-ingress` to expose the application externally using the URL `external.sterling-web.local`.
+ 
+`Note`: The application must be accessible at the path `/web-portal` 
+and should return a valid response when tested with:
 
-All requests to `/web-portal` must be **rewritten to `/`** before forwarding to the backend.
 
 Finally test access using:
 ```bash
