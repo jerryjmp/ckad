@@ -3,7 +3,7 @@
 <details>
 <summary>Click to expand the problem statement</summary>
 
-A Kubernetes cluster is already configured. You must connect to the **correct context** before attempting the task; failure to do so may result in a score of **0**.
+A Kubernetes cluster is already configured. You must connect to the **correct context** before attempting the task.
 
 **Task:**
 
