@@ -6,7 +6,7 @@
 <details>
 <summary>Click to expand the problem statement</summary>
 
-A Kubernetes cluster is already configured. You must connect to the **correct context** before attempting the task; failure to do so may result in a score of **0**.
+A Kubernetes cluster is already configured. You must connect to the **correct context** before attempting the task.
 
 **Context:**
 You need to restrict a Pod so it can only communicate with two specific Pods, and no others.
@@ -15,7 +15,7 @@ You need to restrict a Pod so it can only communicate with two specific Pods, an
 
 Update the Pod `app-connector` in the namespace `netpol-lab` so that it can **only communicate** with the Pods `frontend` and `datastore` using the **existing NetworkPolicies**.
 
-> **Do NOT create, modify, or delete any NetworkPolicies** during this task — only use the existing ones.
+> **Do NOT create, modify, or delete any NetworkPolicies**.
 
 </details>
 
