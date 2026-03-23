@@ -1,4 +1,4 @@
-## 📄 CKAD Question 4 — Network Policy
+## 📄 CKAD Question 1 — Network Policy
 
 
 ### 🧩 Problem Statement
