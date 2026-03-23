@@ -1,7 +1,4 @@
-## 📄 CKAD Question 1 — Network Policy
-
-
-### 🧩 Problem Statement
+## 🧩 Problem Statement
 
 <details>
 <summary>Click to expand the problem statement</summary>
@@ -21,7 +18,7 @@ Update the Pod `app-connector` in the namespace `netpol-lab` so that it can **on
 
 ---
 
-### 🛠 Setup Practice Scenario
+## 🛠 Setup Practice Scenario
 
 <details>
 <summary>Click to expand setup steps</summary>
@@ -174,7 +171,7 @@ Scenario is ready. ✅
 
 ---
 
-### ✅ Solution
+## ✅ Solution
 
 <details>
 <summary>Click to expand the solution</summary>
