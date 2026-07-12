@@ -1,6 +1,4 @@
-## 📄 CKAD Question 3 — Canary Deployment
-
-### 🧩 Problem Statement
+# 🧩 Problem Statement (Canary Deployment)
 
 <details>
 <summary>Click to expand the problem statement</summary>
@@ -23,32 +21,71 @@ The Service `falcon-service` in the namespace `swift-birds` points to **5 Pods**
 
 ---
 
-### 🛠 Setup Practice Scenario
+# 🛠 Setup Practice Scenario
 
 <details>
 <summary>Click to expand setup steps</summary>
 
-**Step 1: Create the namespace**
+| Script | Purpose |
+|--------|---------|
+| `setup_q03_problem_scenario.sh` | Deploys namespace, stable Deployment, Service, and manifest file — run before practice (re-run anytime to practice again) |
+
+---
+
+### 📥 Script : setup_q03_problem_scenario.sh
+
+Run this **before you start practicing** this problem.
+Re-run anytime you want to practice again after fixing.
 
 ```bash
-kubectl create namespace swift-birds
-```
+#!/bin/bash
+# ============================================================
+# CKAD Practice | Q03: Canary Deployment
+# setup_q03_problem_scenario.sh
+# Deploys stable-falcon-deployment (5 replicas) + Service
+# Run on: controlplane node
+# ============================================================
 
-**Step 2: Create the manifest directory**
+set -euo pipefail
 
-```bash
-mkdir -p ~/ckad/swift-birds
-```
+NAMESPACE="swift-birds"
+MANIFEST_DIR="$HOME/ckad/swift-birds"
 
-**Step 3: Create the stable deployment manifest**
+echo ""
+echo "==========================================="
+echo " CKAD Q03 — Setting up Canary Deployment scenario..."
+echo "==========================================="
+echo ""
 
-```bash
-cat <<EOF > ~/ckad/swift-birds/stable-falcon-deployment.yaml
+# ── Step 0: Revert solution-specific changes (fast) ────────────
+# Only undoes what THIS question's solution changes:
+# - canary-falcon-deployment (created by solution)
+# - stable-falcon-deployment replica count (scaled by solution)
+# - canary manifest file (created by solution)
+# Everything else below is applied idempotently.
+echo "[0/5] Reverting any previous solution changes..."
+kubectl delete deployment canary-falcon-deployment -n "$NAMESPACE" --ignore-not-found
+rm -f "$MANIFEST_DIR/canary-falcon-deployment.yaml"
+if kubectl get deployment stable-falcon-deployment -n "$NAMESPACE" &>/dev/null; then
+  kubectl scale deployment stable-falcon-deployment -n "$NAMESPACE" --replicas=5
+fi
+echo "  Reverted."
+
+# ── Step 1: Create the namespace ───────────────────────────────
+echo "[1/5] Ensuring namespace '$NAMESPACE' exists..."
+kubectl create namespace "$NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
+echo "  Namespace ready."
+
+# ── Step 2: Create the manifest directory + stable deployment file ──
+echo "[2/5] Writing manifest file to $MANIFEST_DIR..."
+mkdir -p "$MANIFEST_DIR"
+
+cat <<EOF > "$MANIFEST_DIR/stable-falcon-deployment.yaml"
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: stable-falcon-deployment
-  namespace: swift-birds
+  namespace: $NAMESPACE
 spec:
   replicas: 5
   selector:
@@ -68,23 +105,24 @@ spec:
         - while true; do echo 'Falcon App Running'; sleep 30; done
         imagePullPolicy: IfNotPresent
 EOF
-```
+echo "  Manifest written."
 
-**Step 4: Apply the deployment**
+# ── Step 3: Apply the stable deployment ─────────────────────────
+echo "[3/5] Applying stable-falcon-deployment..."
+kubectl apply -f "$MANIFEST_DIR/stable-falcon-deployment.yaml"
 
-```bash
-kubectl apply -f /ckad/swift-birds/stable-falcon-deployment.yaml
-```
+echo "  Waiting for pods to be Ready..."
+kubectl wait --for=condition=ready pod -l app=falcon -n "$NAMESPACE" --timeout=120s
+echo "  Pods Ready."
 
-**Step 5: Create the Service**
-
-```bash
-cat <<EOF | kubectl apply -f -
+# ── Step 4: Create the Service ──────────────────────────────────
+echo "[4/5] Applying falcon-service..."
+kubectl apply -f - <<EOF
 apiVersion: v1
 kind: Service
 metadata:
   name: falcon-service
-  namespace: swift-birds
+  namespace: $NAMESPACE
 spec:
   selector:
     app: falcon
@@ -92,27 +130,29 @@ spec:
   - port: 80
     targetPort: 80
 EOF
+echo "  Service ready."
+
+# ── Step 5: Verify ────────────────────────────────────────────────
+echo "[5/5] Verifying resources..."
+kubectl get deployment -n "$NAMESPACE"
+kubectl get svc -n "$NAMESPACE"
+kubectl get pods -n "$NAMESPACE"
+
+echo ""
+echo "✅ Q03 scenario is ready!"
+echo ""
+echo "   5 pods running from stable-falcon-deployment."
+echo "   No canary-falcon-deployment exists yet."
+echo "   Manifest available at: $MANIFEST_DIR/stable-falcon-deployment.yaml"
+echo "   Now go fix it! 💪"
+echo ""
 ```
-
-**Step 6: Verify**
-
-```bash
-kubectl get deployment -n swift-birds
-kubectl get svc -n swift-birds
-kubectl get pods -n swift-birds
-```
-
-You should see:
-- 5 pods running from `stable-falcon-deployment`
-- `falcon-service` pointing to all 5 pods via label `app: falcon` ✅
-
-Scenario is ready. ✅
 
 </details>
 
 ---
 
-### ✅ Solution
+# ✅ Solution
 
 <details>
 <summary>Click to expand the solution</summary>
@@ -154,7 +194,7 @@ cp ~/ckad/swift-birds/stable-falcon-deployment.yaml \
 Edit the canary file:
 
 ```bash
-vim /ckad/swift-birds/canary-falcon-deployment.yaml
+vim ~/ckad/swift-birds/canary-falcon-deployment.yaml
 ```
 
 Change the following:
@@ -181,7 +221,7 @@ spec:
 Apply it:
 
 ```bash
-kubectl apply -f /ckad/swift-birds/canary-falcon-deployment.yaml
+kubectl apply -f ~/ckad/swift-birds/canary-falcon-deployment.yaml
 ```
 
 ---
@@ -226,6 +266,63 @@ kubectl get endpoints falcon-service -n swift-birds
 ```
 
 You should see **10 endpoint IPs** — all 10 pods are receiving traffic through the same service. ✅
+
+</details>
+
+---
+
+# ↩️ Restore Cluster State
+
+<details>
+<summary>Click to expand setup steps</summary>
+
+| Script | Purpose |
+|--------|---------|
+| `reset_q03_baseline.sh` | Moving to next problem? Run this to remove all Q03 changes and restore clean cluster state |
+
+---
+
+### 🧹 Script : reset_q03_baseline.sh
+
+**Done with this problem? Moving to the next one?**
+Run this to remove all Q03 changes and restore a clean cluster state.
+
+```bash
+#!/bin/bash
+# ============================================================
+# CKAD Practice | Q03: Canary Deployment
+# reset_q03_baseline.sh
+# ============================================================
+
+set -euo pipefail
+
+NAMESPACE="swift-birds"
+MANIFEST_DIR="$HOME/ckad/swift-birds"
+
+echo ""
+echo "==========================================="
+echo " CKAD Q03 — Restoring cluster to baseline..."
+echo "==========================================="
+echo ""
+
+echo "[1/2] Deleting namespace '$NAMESPACE' (Deployments + Service)..."
+kubectl delete namespace "$NAMESPACE" --ignore-not-found
+echo "  Waiting for namespace deletion to complete..."
+while kubectl get namespace "$NAMESPACE" &>/dev/null; do
+  sleep 2
+done
+echo "  Namespace removed."
+
+echo "[2/2] Removing manifest directory..."
+rm -rf "$MANIFEST_DIR"
+echo "  Manifest directory removed."
+
+echo ""
+echo "✅ Cluster is back to baseline!"
+echo ""
+echo "   Safe to move to next problem. 🚀"
+echo ""
+```
 
 </details>
 
