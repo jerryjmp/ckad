@@ -1,4 +1,4 @@
-## 🧩 Problem Statement
+# 🧩 Problem Statement (Ingress - Path Rewrite)
 
 <details>
 <summary>Click to expand the problem statement</summary>
@@ -7,15 +7,12 @@ A Kubernetes cluster is already configured. You must connect to the **correct co
 
 **Task:**
 
-A web application is running in the namespace `external`. Deployed an nginx-based application and expose it via a Service `nginx-service` on port `8080`.
+A web application is running in the namespace `external`. An nginx-based application is deployed and exposed via a Service `nginx-service` on port `8080`.
 
 Create an Ingress resource named `external-ingress` to expose the application externally using the URL `external.sterling-web.local`.
- 
-`Note`: The application must be accessible at the path `/web-portal` 
-and should return a valid response when tested with:
 
+`Note`: The application must be accessible at the path `/web-portal` and should return a valid response when tested with:
 
-Finally test access using:
 ```bash
 curl -L http://external.sterling-web.local/web-portal
 ```
@@ -24,36 +21,76 @@ curl -L http://external.sterling-web.local/web-portal
 
 ---
 
-## 🛠 Setup Practice Scenario
+# 🛠 Setup Practice Scenario
 
 <details>
 <summary>Click to expand setup steps</summary>
 
-**Step 1: Install Traefik Ingress controller**
+| Script | Purpose |
+|--------|---------|
+| `setup_q01_problem_scenario.sh` | Installs Traefik, deploys the nginx app + Service in `external` namespace, adds hosts entry — run before practice (re-run anytime to practice again) |
 
-**install helm**:
+---
 
-```
-curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-4
-chmod 700 get_helm.sh
-./get_helm.sh
-```
+### 📥 Script : setup_q01_problem_scenario.sh
 
-**create namespace**:
+Run this **before you start practicing** this problem.
+Re-run anytime you want to practice again after fixing.
 
-```
-kubectl create namespace traefik
-```
+```bash
+#!/bin/bash
+# ============================================================
+# CKAD Practice | Q01: Ingress - Path Rewrite
+# setup_q01_problem_scenario.sh
+# Deploys Traefik + nginx app/service, no Ingress/Middleware
+# Run on: controlplane node
+# ============================================================
 
-**install traefik using helm**:
+set -euo pipefail
 
-```
-helm repo add traefik https://helm.traefik.io/traefik
-```
-```
+WORK_DIR="/tmp/ckad-q01-setup"
+NAMESPACE="external"
+HOSTNAME_ENTRY="external.sterling-web.local"
+
+echo ""
+echo "==========================================="
+echo " CKAD Q01 — Setting up Ingress scenario..."
+echo "==========================================="
+echo ""
+
+mkdir -p "$WORK_DIR"
+cd "$WORK_DIR"
+
+# ── Step 0: Clean any leftover solution artifacts first ───────
+# This makes the script idempotent — re-running it always resets
+# back to the "problem" state, even if the user already solved it.
+echo "[0/6] Clearing any previous solution artifacts (Ingress/Middleware)..."
+kubectl delete ingress external-ingress -n "$NAMESPACE" --ignore-not-found
+kubectl delete middleware strip-prefix -n "$NAMESPACE" --ignore-not-found 2>/dev/null || true
+echo "  Cleared."
+
+# ── Step 1: Install helm (skip if already installed) ─────────
+echo "[1/6] Checking/Installing helm..."
+if ! command -v helm &>/dev/null; then
+  curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-4
+  chmod 700 get_helm.sh
+  ./get_helm.sh
+  echo "  helm installed."
+else
+  echo "  helm already installed, skipping."
+fi
+
+# ── Step 2: Create traefik namespace ──────────────────────────
+echo "[2/6] Creating traefik namespace..."
+kubectl create namespace traefik --dry-run=client -o yaml | kubectl apply -f -
+echo "  Namespace ready."
+
+# ── Step 3: Install Traefik via helm ──────────────────────────
+echo "[3/6] Installing Traefik ingress controller..."
+
+helm repo add traefik https://helm.traefik.io/traefik --force-update
 helm repo update
-```
-```
+
 cat <<EOF > /tmp/traefik-values.yaml
 ports:
   web:
@@ -79,34 +116,40 @@ affinity:
         - key: node-role.kubernetes.io/control-plane
           operator: Exists
 EOF
-```
-```
-helm install traefik traefik/traefik \
-  --namespace traefik \
-  --values /tmp/traefik-values.yaml
-```
 
-**get controlplane node IP**:
-```
+if helm status traefik -n traefik &>/dev/null; then
+  echo "  Traefik already installed, skipping helm install."
+else
+  helm install traefik traefik/traefik \
+    --namespace traefik \
+    --values /tmp/traefik-values.yaml
+fi
+
+echo "  Waiting for Traefik pod to be Ready..."
+kubectl wait --for=condition=ready pod \
+  -l app.kubernetes.io/name=traefik -n traefik --timeout=120s || true
+echo "  Traefik should be up."
+
+# ── Step 4: Add hosts entry ────────────────────────────────────
+echo "[4/6] Adding $HOSTNAME_ENTRY to /etc/hosts..."
+
 NODE_IP=$(kubectl get nodes -o wide | grep control-plane | awk '{print $6}')
-```
-**add to /etc/hosts**:
-```
-echo "$NODE_IP external.sterling-web.local" | sudo tee -a /etc/hosts
-```
 
-**Step 2: Create Deployment and Service**
-```
-k create ns external
-```
+sudo sed -i "/${HOSTNAME_ENTRY}/d" /etc/hosts
+echo "$NODE_IP $HOSTNAME_ENTRY" | sudo tee -a /etc/hosts >/dev/null
+echo "  Hosts entry added: $NODE_IP $HOSTNAME_ENTRY"
 
-```bash
-cat <<EOF | kubectl apply -f -
+# ── Step 5: Create namespace + Deployment + Service ───────────
+echo "[5/6] Deploying nginx-app Deployment and nginx-service..."
+
+kubectl create namespace "$NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
+
+kubectl apply -f - <<EOF
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: nginx-app
-  namespace: external
+  namespace: $NAMESPACE
 spec:
   replicas: 1
   selector:
@@ -127,7 +170,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: nginx-service
-  namespace: external
+  namespace: $NAMESPACE
 spec:
   selector:
     app: nginx-app
@@ -136,21 +179,29 @@ spec:
     port: 8080
     targetPort: 80
 EOF
+
+echo "  Waiting for nginx-app pod to be Ready..."
+kubectl wait --for=condition=ready pod \
+  -l app=nginx-app -n "$NAMESPACE" --timeout=120s
+echo "  nginx-app pod is Ready."
+
+# ── Step 6: Verify ──────────────────────────────────────────────
+echo "[6/6] Verifying resources..."
+kubectl get all -n "$NAMESPACE"
+
+echo ""
+echo "✅ Q01 scenario is ready!"
+echo ""
+echo "   No Ingress or Middleware exists yet."
+echo "   Now go fix them! 💪"
+echo ""
 ```
-
-**Step 2: Verify**
-
-```bash
-kubectl get all -n external
-```
-
-Scenario is ready — no Ingress or Middleware exists yet. ✅
 
 </details>
 
 ---
 
-## ✅ Solution
+# ✅ Solution
 
 <details>
 <summary>Click to expand the solution</summary>
@@ -213,7 +264,7 @@ EOF
 
 ```bash
 kubectl get ingress -n external
-kubectl describe ingress nginx-ingress -n external
+kubectl describe ingress external-ingress -n external
 ```
 
 ---
@@ -224,11 +275,11 @@ kubectl describe ingress nginx-ingress -n external
 curl -L http://external.sterling-web.local/web-portal
 ```
 
-### Solution using Nginx Ingress Controller(Optional)
+---
+
+### Solution using Nginx Ingress Controller (Optional)
 
 **No Middleware needed — just one annotation does the rewrite:**
-
-**Step 1: Create Ingress**
 
 ```bash
 cat <<EOF | kubectl apply -f -
@@ -254,6 +305,77 @@ spec:
               number: 8080
 EOF
 ```
+
+</details>
+
+---
+
+# ↩️ Restore Cluster State
+
+<details>
+<summary>Click to expand setup steps</summary>
+
+| Script | Purpose |
+|--------|---------|
+| `reset_q01_baseline.sh` | Moving to next problem? Run this to remove all Q01 changes and restore clean cluster state |
+
+---
+
+### 🧹 Script : reset_q01_baseline.sh
+
+**Done with this problem? Moving to the next one?**
+Run this to remove all Q01 changes and restore a clean cluster state.
+
+```bash
+#!/bin/bash
+# ============================================================
+# CKAD Practice | Q01: Ingress - Path Rewrite
+# reset_q01_baseline.sh
+# ============================================================
+
+set -euo pipefail
+
+WORK_DIR="/tmp/ckad-q01-setup"
+NAMESPACE="external"
+HOSTNAME_ENTRY="external.sterling-web.local"
+
+echo ""
+echo "==========================================="
+echo " CKAD Q01 — Restoring cluster to baseline..."
+echo "==========================================="
+echo ""
+
+# ── Step 1: Remove external namespace (deployment/service/ingress/middleware) ──
+echo "[1/4] Deleting namespace '$NAMESPACE' (Deployment, Service, Ingress, Middleware)..."
+kubectl delete namespace "$NAMESPACE" --ignore-not-found
+echo "  Namespace removed."
+
+# ── Step 2: Uninstall Traefik ──────────────────────────────────
+echo "[2/4] Uninstalling Traefik..."
+if helm status traefik -n traefik &>/dev/null; then
+  helm uninstall traefik -n traefik
+fi
+kubectl delete namespace traefik --ignore-not-found
+echo "  Traefik removed."
+
+# ── Step 3: Remove hosts entry ─────────────────────────────────
+echo "[3/4] Removing $HOSTNAME_ENTRY from /etc/hosts..."
+sudo sed -i "/${HOSTNAME_ENTRY}/d" /etc/hosts
+echo "  Hosts entry removed."
+
+# ── Step 4: Clean up temp files ────────────────────────────────
+echo "[4/4] Cleaning up temp files..."
+rm -rf "$WORK_DIR"
+rm -f /tmp/traefik-values.yaml
+echo "  Temp files removed."
+
+echo ""
+echo "✅ Cluster is back to baseline!"
+echo ""
+echo "   Safe to move to next problem. 🚀"
+echo ""
+```
+
 </details>
 
 ---
