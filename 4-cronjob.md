@@ -1,9 +1,9 @@
-## 🧩 Problem Statement
+# 🧩 Problem Statement (CronJob - DNS Checker)
 
 <details>
 <summary>Click to expand the problem statement</summary>
 
-A Kubernetes cluster is already configured. You must connect to the **correct context** before attempting the task; failure to do so may result in a score of **0**.
+A Kubernetes cluster is already configured. You must connect to the **correct context** before attempting the task.
 
 **Task:**
 
@@ -24,24 +24,75 @@ A Kubernetes cluster is already configured. You must connect to the **correct co
 
 ---
 
-## 🛠 Setup Practice Scenario
+# 🛠 Setup Practice Scenario
 
 <details>
 <summary>Click to expand setup steps</summary>
 
-**Step 1: Create namespace**
+| Script | Purpose |
+|--------|---------|
+| `setup_q04_problem_scenario.sh` | Creates the `cron-ops` namespace — run before practice (re-run anytime to practice again) |
+
+---
+
+### 📥 Script : setup_q04_problem_scenario.sh
+
+Run this **before you start practicing** this problem.
+Re-run anytime you want to practice again after fixing.
 
 ```bash
-kubectl create namespace cron-ops
-```
+#!/bin/bash
+# ============================================================
+# CKAD Practice | Q04: CronJob - DNS Checker
+# setup_q04_problem_scenario.sh
+# Creates cron-ops namespace only — CronJob built from scratch
+# Run on: controlplane node
+# ============================================================
 
-Scenario is ready — just need to create the CronJob from scratch. ✅
+set -euo pipefail
+
+NAMESPACE="cron-ops"
+
+echo ""
+echo "==========================================="
+echo " CKAD Q04 — Setting up CronJob scenario..."
+echo "==========================================="
+echo ""
+
+# ── Step 0: Revert solution-specific changes (fast) ────────────
+# Only undoes what THIS question's solution creates:
+# - CronJob dns-checker
+# - Job dns-checker-test, plus any Jobs the CronJob's own
+#   schedule may have spawned (this namespace only ever holds
+#   CronJob-related jobs, so a full jobs wipe is safe here).
+echo "[0/2] Reverting any previous solution changes..."
+kubectl delete cronjob dns-checker -n "$NAMESPACE" --ignore-not-found
+kubectl delete jobs --all -n "$NAMESPACE" --ignore-not-found
+echo "  Reverted."
+
+# ── Step 1: Create the namespace ───────────────────────────────
+echo "[1/2] Ensuring namespace '$NAMESPACE' exists..."
+kubectl create namespace "$NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
+echo "  Namespace ready."
+
+# ── Step 2: Verify ────────────────────────────────────────────────
+echo "[2/2] Verifying namespace..."
+kubectl get namespace "$NAMESPACE"
+kubectl get cronjob,job,pods -n "$NAMESPACE"
+
+echo ""
+echo "✅ Q04 scenario is ready!"
+echo ""
+echo "   No CronJob or Job exists yet."
+echo "   Now go create dns-checker! 💪"
+echo ""
+```
 
 </details>
 
 ---
 
-## ✅ Solution
+# ✅ Solution
 
 <details>
 <summary>Click to expand the solution</summary>
@@ -158,6 +209,58 @@ nameserver 8.8.8.8
 ✅ Pod never restarts
 ✅ Pod terminates after 8 seconds
 ✅ Manual test job created and ran successfully
+
+</details>
+
+---
+
+# ↩️ Restore Cluster State
+
+<details>
+<summary>Click to expand setup steps</summary>
+
+| Script | Purpose |
+|--------|---------|
+| `reset_q04_baseline.sh` | Moving to next problem? Run this to remove all Q04 changes and restore clean cluster state |
+
+---
+
+### 🧹 Script : reset_q04_baseline.sh
+
+**Done with this problem? Moving to the next one?**
+Run this to remove all Q04 changes and restore a clean cluster state.
+
+```bash
+#!/bin/bash
+# ============================================================
+# CKAD Practice | Q04: CronJob - DNS Checker
+# reset_q04_baseline.sh
+# ============================================================
+
+set -euo pipefail
+
+NAMESPACE="cron-ops"
+
+echo ""
+echo "==========================================="
+echo " CKAD Q04 — Restoring cluster to baseline..."
+echo "==========================================="
+echo ""
+
+echo "[1/1] Deleting namespace '$NAMESPACE' (CronJob + Jobs + Pods)..."
+kubectl delete namespace "$NAMESPACE" --ignore-not-found
+echo "  Waiting for namespace deletion to complete..."
+while kubectl get namespace "$NAMESPACE" &>/dev/null; do
+  sleep 2
+done
+echo "  Namespace removed."
+
+echo ""
+echo "✅ Cluster is back to baseline!"
+echo ""
+echo "   Safe to move to next problem. 🚀"
+echo ""
+```
 
 </details>
 
