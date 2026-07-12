@@ -1,4 +1,4 @@
-## 🧩 Problem Statement
+# 🧩 Problem Statement (NetworkPolicy - Pod Label Access)
 
 <details>
 <summary>Click to expand the problem statement</summary>
@@ -18,26 +18,67 @@ Update the Pod `app-connector` in the namespace `netpol-lab` so that it can **on
 
 ---
 
-## 🛠 Setup Practice Scenario
+# 🛠 Setup Practice Scenario
 
 <details>
 <summary>Click to expand setup steps</summary>
 
-**Step 1: Create the namespace**
+| Script | Purpose |
+|--------|---------|
+| `setup_q02_problem_scenario.sh` | Deploys namespace, Pods, and NetworkPolicies — run before practice (re-run anytime to practice again) |
+
+---
+
+### 📥 Script : setup_q02_problem_scenario.sh
+
+Run this **before you start practicing** this problem.
+Re-run anytime you want to practice again after fixing.
 
 ```bash
-kubectl create namespace netpol-lab
-```
+#!/bin/bash
+# ============================================================
+# CKAD Practice | Q02: NetworkPolicy - Pod Label Access
+# setup_q02_problem_scenario.sh
+# Deploys 4 pods + 4 NetworkPolicies, app-connector unlabeled
+# Run on: controlplane node
+# ============================================================
 
-**Step 2: Create the three Pods**
+set -euo pipefail
 
-```bash
-cat <<EOF | kubectl apply -f -
+NAMESPACE="netpol-lab"
+
+echo ""
+echo "==========================================="
+echo " CKAD Q02 — Setting up NetworkPolicy scenario..."
+echo "==========================================="
+echo ""
+
+# ── Step 0: Revert solution-specific changes (fast) ────────────
+# Only undoes what THIS question's solution changes (labels on
+# app-connector). Everything else below is applied idempotently,
+# so re-running this script is quick — no namespace delete/recreate.
+echo "[0/4] Reverting any previous solution changes..."
+if kubectl get pod app-connector -n "$NAMESPACE" &>/dev/null; then
+  kubectl label pod app-connector -n "$NAMESPACE" frontend-access- datastore-access- --overwrite 2>/dev/null || true
+  echo "  app-connector labels reset."
+else
+  echo "  Nothing to revert (first run)."
+fi
+
+# ── Step 1: Create the namespace ───────────────────────────────
+echo "[1/4] Ensuring namespace '$NAMESPACE' exists..."
+kubectl create namespace "$NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
+echo "  Namespace ready."
+
+# ── Step 2: Create the four Pods ───────────────────────────────
+echo "[2/4] Creating Pods (frontend, datastore, app-connector, extra-pod)..."
+
+kubectl apply -f - <<EOF
 apiVersion: v1
 kind: Pod
 metadata:
   name: frontend
-  namespace: netpol-lab
+  namespace: $NAMESPACE
   labels:
     app: frontend
     item: netpol-lab
@@ -50,7 +91,7 @@ apiVersion: v1
 kind: Pod
 metadata:
   name: datastore
-  namespace: netpol-lab
+  namespace: $NAMESPACE
   labels:
     app: datastore
     item: netpol-lab
@@ -63,7 +104,7 @@ apiVersion: v1
 kind: Pod
 metadata:
   name: app-connector
-  namespace: netpol-lab
+  namespace: $NAMESPACE
   labels:
     app: app-connector
     item: netpol-lab
@@ -76,7 +117,7 @@ apiVersion: v1
 kind: Pod
 metadata:
   name: extra-pod
-  namespace: netpol-lab
+  namespace: $NAMESPACE
   labels:
     app: extra-pod
     item: netpol-lab
@@ -85,17 +126,20 @@ spec:
   - name: extra-pod
     image: devopstechtales/ckad-exam-questions:netpol-extra-pod
 EOF
-```
 
-**Step 3: Create the NetworkPolicies**
+echo "  Waiting for all pods to be Ready..."
+kubectl wait --for=condition=ready pod --all -n "$NAMESPACE" --timeout=120s
+echo "  All pods Ready."
 
-```bash
-cat <<EOF | kubectl apply -f -
+# ── Step 3: Create the NetworkPolicies ─────────────────────────
+echo "[3/4] Creating NetworkPolicies..."
+
+kubectl apply -f - <<EOF
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: access-frontend
-  namespace: netpol-lab
+  namespace: $NAMESPACE
 spec:
   podSelector:
     matchLabels:
@@ -112,7 +156,7 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: access-datastore
-  namespace: netpol-lab
+  namespace: $NAMESPACE
 spec:
   podSelector:
     matchLabels:
@@ -129,7 +173,7 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: all-access
-  namespace: netpol-lab
+  namespace: $NAMESPACE
 spec:
   podSelector:
     matchLabels:
@@ -146,32 +190,34 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: default-deny
-  namespace: netpol-lab
+  namespace: $NAMESPACE
 spec:
   podSelector: {}
   policyTypes:
   - Ingress
 EOF
+
+echo "  NetworkPolicies created."
+
+# ── Step 4: Verify ──────────────────────────────────────────────
+echo "[4/4] Verifying resources..."
+kubectl get pods -n "$NAMESPACE" --show-labels
+kubectl get networkpolicy -n "$NAMESPACE"
+
+echo ""
+echo "✅ Q02 scenario is ready!"
+echo ""
+echo "   3 pods to consider: frontend, datastore, app-connector"
+echo "   app-connector currently has NO access labels."
+echo "   Now go fix it! 💪"
+echo ""
 ```
-
-**Step 4: Verify**
-
-```bash
-kubectl get pods -n netpol-lab --show-labels
-kubectl get networkpolicy -n netpol-lab
-```
-
-You should see:
-- 3 pods running: `frontend`, `datastore`, `app-connector`
-- 4 NetworkPolicies: `access-frontend`, `access-datastore`, `all-access`, `default-deny` ✅
-
-Scenario is ready. ✅
 
 </details>
 
 ---
 
-## ✅ Solution
+# ✅ Solution
 
 <details>
 <summary>Click to expand the solution</summary>
@@ -207,7 +253,6 @@ Key output:
 ```
 PodSelector:  app=frontend
 Ingress - From PodSelector: frontend-access=true
-Egress  - To PodSelector:   frontend-access=true
 ```
 
 > So any pod that wants to talk to `frontend` must have label `frontend-access=true`
@@ -224,7 +269,6 @@ Key output:
 ```
 PodSelector:  app=datastore
 Ingress - From PodSelector: datastore-access=true
-Egress  - To PodSelector:   datastore-access=true
 ```
 
 > So any pod that wants to talk to `datastore` must have label `datastore-access=true`
@@ -255,6 +299,58 @@ app-connector   app=app-connector,item=netpol-lab,frontend-access=true,datastore
 ✅ `app-connector` can now communicate with `frontend`
 ✅ `app-connector` can now communicate with `datastore`
 ✅ No new NetworkPolicies were created or modified
+
+</details>
+
+---
+
+# ↩️ Restore Cluster State
+
+<details>
+<summary>Click to expand setup steps</summary>
+
+| Script | Purpose |
+|--------|---------|
+| `reset_q02_baseline.sh` | Moving to next problem? Run this to remove all Q02 changes and restore clean cluster state |
+
+---
+
+### 🧹 Script : reset_q02_baseline.sh
+
+**Done with this problem? Moving to the next one?**
+Run this to remove all Q02 changes and restore a clean cluster state.
+
+```bash
+#!/bin/bash
+# ============================================================
+# CKAD Practice | Q02: NetworkPolicy - Pod Label Access
+# reset_q02_baseline.sh
+# ============================================================
+
+set -euo pipefail
+
+NAMESPACE="netpol-lab"
+
+echo ""
+echo "==========================================="
+echo " CKAD Q02 — Restoring cluster to baseline..."
+echo "==========================================="
+echo ""
+
+echo "[1/1] Deleting namespace '$NAMESPACE' (Pods + NetworkPolicies)..."
+kubectl delete namespace "$NAMESPACE" --ignore-not-found
+echo "  Waiting for namespace deletion to complete..."
+while kubectl get namespace "$NAMESPACE" &>/dev/null; do
+  sleep 2
+done
+echo "  Namespace removed."
+
+echo ""
+echo "✅ Cluster is back to baseline!"
+echo ""
+echo "   Safe to move to next problem. 🚀"
+echo ""
+```
 
 </details>
 
