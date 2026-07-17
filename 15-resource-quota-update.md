@@ -1,4 +1,4 @@
-## 🧩 Problem Statement
+# 🧩 Problem Statement (Resource Requests, Limits & ResourceQuota)
 
 <details>
 <summary>Click to expand the problem statement</summary>
@@ -20,60 +20,82 @@ Modify the Pods of the Deployment `nginx-resources` in the namespace `pod-resour
 
 ---
 
-## 🛠 Setup Practice Scenario
+# 🛠 Setup Practice Scenario
 
 <details>
 <summary>Click to expand setup steps</summary>
 
-**Step 1: Create namespace**
+| Script | Purpose |
+|--------|---------|
+| `setup_q15_problem_scenario.sh` | Deploys a ResourceQuota (30m CPU / 36Mi mem) and `nginx-resources` with no resources set — run before practice (re-run anytime to practice again) |
+
+---
+
+### 📥 Script : setup_q15_problem_scenario.sh
+
+Run this **before you start practicing** this problem.
+Re-run anytime you want to practice again after fixing.
 
 ```bash
-kubectl create namespace pod-resources
-```
+#!/bin/bash
+# ============================================================
+# CKAD Practice | Q15: Resource Requests, Limits & ResourceQuota
+# setup_q15_problem_scenario.sh
+# Deploys ResourceQuota (30m/36Mi) + nginx-resources with no
+# resources set — pods fail quota validation until fixed
+# Run on: controlplane node
+# ============================================================
 
-**Step 2: Create ResourceQuota — intentionally low to simulate exam**
+set -euo pipefail
 
-```bash
-cat <<EOF | kubectl apply -f -
+NAMESPACE="pod-resources"
+DEPLOYMENT="nginx-resources"
+
+echo ""
+echo "==========================================="
+echo " CKAD Q15 — Setting up ResourceQuota scenario..."
+echo "==========================================="
+echo ""
+
+# ── Step 0: Revert solution-specific changes (fast) ────────────
+# Only undoes what THIS question's solution changes:
+# - Deployment resources (solution adds requests/limits)
+# - ResourceQuota hard limits (solution raises them to 60m/76Mi)
+# Both are re-applied to their original scenario state below.
+echo "[0/4] Reverting any previous solution changes..."
+kubectl delete deployment "$DEPLOYMENT" -n "$NAMESPACE" --ignore-not-found
+echo "  Reverted (Deployment removed; recreated without resources below)."
+
+# ── Step 1: Create the namespace ───────────────────────────────
+echo "[1/4] Ensuring namespace '$NAMESPACE' exists..."
+kubectl create namespace "$NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
+echo "  Namespace ready."
+
+# ── Step 2: Create/reset the ResourceQuota (intentionally low) ──
+echo "[2/4] Applying ResourceQuota (limits.cpu=30m, limits.memory=36Mi)..."
+
+kubectl apply -f - <<EOF
 apiVersion: v1
 kind: ResourceQuota
 metadata:
   name: pod-resources-quota
-  namespace: pod-resources
+  namespace: $NAMESPACE
 spec:
   hard:
-    limits.cpu: "30m"       # ❌ intentionally low - needs fixing in solution
-    limits.memory: "36Mi"   # ❌ intentionally low - needs fixing in solution
+    limits.cpu: "30m"
+    limits.memory: "36Mi"
 EOF
-```
+echo "  ResourceQuota applied."
 
-**Step 3: Verify ResourceQuota**
+# ── Step 3: Create the Deployment without resource requests/limits ──
+echo "[3/4] Creating $DEPLOYMENT (no resources set)..."
 
-```bash
-kubectl describe ns pod-resources
-```
-
-Expected output:
-```
-Resource Quotas
-  Name: pod-resources-quota
-  Resource       Used  Hard
-  --------       ----  ----
-  limits.cpu     0     20m
-  limits.memory  0     26Mi
-
-No LimitRange resource.
-```
-
-**Step 4: Create the Deployment without resource limits**
-
-```bash
-cat <<EOF | kubectl apply -f -
+kubectl apply -f - <<EOF
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: nginx-resources
-  namespace: pod-resources
+  name: $DEPLOYMENT
+  namespace: $NAMESPACE
 spec:
   replicas: 1
   selector:
@@ -92,34 +114,30 @@ spec:
         - -c
         - while true; do echo 'Running'; sleep 10; done
 EOF
-```
+echo "  Applied (intentionally broken — no resources set)."
 
-**Step 5: Verify pods are failing**
+# ── Step 4: Verify pods are failing ─────────────────────────────
+echo "[4/4] Verifying scenario is broken..."
+sleep 3
+kubectl get deployment "$DEPLOYMENT" -n "$NAMESPACE"
+kubectl describe ns "$NAMESPACE"
+echo "  ReplicaSet error (expect quota validation failure):"
+kubectl describe replicaset -n "$NAMESPACE" 2>/dev/null | grep -A5 "Error" || true
 
-```bash
-kubectl get deployment nginx-resources -n pod-resources
-kubectl describe replicaset -n pod-resources | grep -A5 "Error"
+echo ""
+echo "✅ Q15 scenario is ready!"
+echo ""
+echo "   nginx-resources cannot schedule — no cpu/memory limits set,"
+echo "   and the namespace ResourceQuota requires them."
+echo "   Now go fix it! 💪"
+echo ""
 ```
-
-Expected:
-```
-NAME               READY   UP-TO-DATE   AVAILABLE
-nginx-resources    0/1     0            0
-```
-
-Error:
-```
-Error: failed quota: must specify
-limits.cpu, limits.memory
-```
-
-Scenario is ready — pods failing due to missing resources! ✅
 
 </details>
 
 ---
 
-## ✅ Solution
+# ✅ Solution
 
 <details>
 <summary>Click to expand the solution</summary>
@@ -211,7 +229,7 @@ kubectl describe replicaset -n pod-resources | grep Error
 Output:
 ```
 Error: exceeded quota: pod-resources-quota
-  limited: limits.cpu=20m, limits.memory=26Mi
+  limited: limits.cpu=30m, limits.memory=36Mi
 ```
 
 > RQ hard limits are too low — pod needs 60m cpu and 76Mi memory but RQ only allows 30m and 36Mi!
@@ -284,6 +302,58 @@ Limits:
 Requests:
   cpu:     30m
   memory:  38Mi
+```
+
+</details>
+
+---
+
+# ↩️ Restore Cluster State
+
+<details>
+<summary>Click to expand setup steps</summary>
+
+| Script | Purpose |
+|--------|---------|
+| `reset_q15_baseline.sh` | Moving to next problem? Run this to remove all Q15 changes and restore clean cluster state |
+
+---
+
+### 🧹 Script : reset_q15_baseline.sh
+
+**Done with this problem? Moving to the next one?**
+Run this to remove all Q15 changes and restore a clean cluster state.
+
+```bash
+#!/bin/bash
+# ============================================================
+# CKAD Practice | Q15: Resource Requests, Limits & ResourceQuota
+# reset_q15_baseline.sh
+# ============================================================
+
+set -euo pipefail
+
+NAMESPACE="pod-resources"
+
+echo ""
+echo "==========================================="
+echo " CKAD Q15 — Restoring cluster to baseline..."
+echo "==========================================="
+echo ""
+
+echo "[1/1] Deleting namespace '$NAMESPACE' (Deployment + ResourceQuota)..."
+kubectl delete namespace "$NAMESPACE" --ignore-not-found
+echo "  Waiting for namespace deletion to complete..."
+while kubectl get namespace "$NAMESPACE" &>/dev/null; do
+  sleep 2
+done
+echo "  Namespace removed."
+
+echo ""
+echo "✅ Cluster is back to baseline!"
+echo ""
+echo "   Safe to move to next problem. 🚀"
+echo ""
 ```
 
 </details>
