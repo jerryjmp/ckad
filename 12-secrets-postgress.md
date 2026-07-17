@@ -1,4 +1,4 @@
-## 🧩 Problem Statement
+# 🧩 Problem Statement (Move Hardcoded Secrets to a Secret)
 
 <details>
 <summary>Click to expand the problem statement</summary>
@@ -23,26 +23,66 @@ You need to move hardcoded secrets in a Pod's environment variables to a Kuberne
 
 ---
 
-## 🛠 Setup Practice Scenario
+# 🛠 Setup Practice Scenario
 
 <details>
 <summary>Click to expand setup steps</summary>
 
-**Step 1: Create namespace**
+| Script | Purpose |
+|--------|---------|
+| `setup_q12_problem_scenario.sh` | Deploys `postgres-db` with hardcoded env vars, no Secret exists yet — run before practice (re-run anytime to practice again) |
+
+---
+
+### 📥 Script : setup_q12_problem_scenario.sh
+
+Run this **before you start practicing** this problem.
+Re-run anytime you want to practice again after fixing.
 
 ```bash
-kubectl create namespace data-layer
-```
+#!/bin/bash
+# ============================================================
+# CKAD Practice | Q12: Move Hardcoded Secrets to a Secret
+# setup_q12_problem_scenario.sh
+# Deploys postgres-db with hardcoded env vars, no Secret exists
+# Run on: controlplane node
+# ============================================================
 
-**Step 2: Create Deployment with real postgres and hardcoded env vars**
+set -euo pipefail
 
-```bash
-cat <<EOF | kubectl apply -f -
+NAMESPACE="data-layer"
+DEPLOYMENT="postgres-db"
+
+echo ""
+echo "==========================================="
+echo " CKAD Q12 — Setting up Secrets scenario..."
+echo "==========================================="
+echo ""
+
+# ── Step 0: Revert solution-specific changes (fast) ────────────
+# Only undoes what THIS question's solution creates/changes:
+# - Secret postgres-creds (created by solution → deleted)
+# - Deployment env vars (switched to secretKeyRef by solution →
+#   Step 2 below re-applies the full Deployment with hardcoded
+#   values, which overwrites any valueFrom edits in one shot)
+echo "[0/2] Reverting any previous solution changes..."
+kubectl delete secret postgres-creds -n "$NAMESPACE" --ignore-not-found
+echo "  Reverted (Secret removed; Deployment env reset in next step)."
+
+# ── Step 1: Create the namespace ───────────────────────────────
+echo "[1/2] Ensuring namespace '$NAMESPACE' exists..."
+kubectl create namespace "$NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
+echo "  Namespace ready."
+
+# ── Step 2: Apply Deployment with hardcoded env vars ────────────
+echo "[2/2] Applying $DEPLOYMENT with hardcoded env vars..."
+
+kubectl apply -f - <<EOF
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: postgres-db
-  namespace: data-layer
+  name: $DEPLOYMENT
+  namespace: $NAMESPACE
 spec:
   replicas: 1
   selector:
@@ -58,48 +98,34 @@ spec:
         image: postgres:15
         env:
         - name: POSTGRES_USER
-          value: "admin"            # ❌ hardcoded
+          value: "admin"
         - name: POSTGRES_DB
-          value: "myappdb"          # ❌ hardcoded
+          value: "myappdb"
         - name: POSTGRES_PASSWORD
-          value: "S3cur3P@ss!"      # ❌ hardcoded
+          value: "S3cur3P@ss!"
 EOF
-```
 
-**Step 3: Verify postgres is running**
+echo "  Waiting for pod to be Ready..."
+kubectl wait --for=condition=ready pod -l app=postgres-db -n "$NAMESPACE" --timeout=120s
+echo "  Pod Ready."
 
-```bash
-kubectl get pods -n data-layer
-kubectl logs -n data-layer deploy/postgres-db | tail -5
-```
+echo "  Verifying hardcoded values are visible..."
+kubectl describe deployment "$DEPLOYMENT" -n "$NAMESPACE" | grep -A6 "Environment"
 
-Expected log output:
+echo ""
+echo "✅ Q12 scenario is ready!"
+echo ""
+echo "   postgres-db is running with hardcoded credentials in env vars."
+echo "   No postgres-creds Secret exists yet."
+echo "   Now go fix it! 💪"
+echo ""
 ```
-PostgreSQL init process complete; ready for start up.
-LOG: database system is ready to accept connections
-```
-
-**Step 4: Verify hardcoded values visible in deployment**
-
-```bash
-kubectl describe deployment postgres-db -n data-layer | grep -A6 "Environment"
-```
-
-Expected output:
-```
-Environment:
-  POSTGRES_USER:      admin
-  POSTGRES_DB:        myappdb
-  POSTGRES_PASSWORD:  S3cur3P@ss!
-```
-
-Scenario is ready — hardcoded secrets are visible! ✅
 
 </details>
 
 ---
 
-## ✅ Solution
+# ✅ Solution
 
 <details>
 <summary>Click to expand the solution</summary>
@@ -241,6 +267,57 @@ via socket in "/var/run/postgresql" at port "5432".
 ✅ Values now coming from Secret not hardcoded
 ✅ Connection works with Secret-based credentials
 
+</details>
+
+---
+
+# ↩️ Restore Cluster State
+
+<details>
+<summary>Click to expand setup steps</summary>
+
+| Script | Purpose |
+|--------|---------|
+| `reset_q12_baseline.sh` | Moving to next problem? Run this to remove all Q12 changes and restore clean cluster state |
+
+---
+
+### 🧹 Script : reset_q12_baseline.sh
+
+**Done with this problem? Moving to the next one?**
+Run this to remove all Q12 changes and restore a clean cluster state.
+
+```bash
+#!/bin/bash
+# ============================================================
+# CKAD Practice | Q12: Move Hardcoded Secrets to a Secret
+# reset_q12_baseline.sh
+# ============================================================
+
+set -euo pipefail
+
+NAMESPACE="data-layer"
+
+echo ""
+echo "==========================================="
+echo " CKAD Q12 — Restoring cluster to baseline..."
+echo "==========================================="
+echo ""
+
+echo "[1/1] Deleting namespace '$NAMESPACE' (Deployment + Secret)..."
+kubectl delete namespace "$NAMESPACE" --ignore-not-found
+echo "  Waiting for namespace deletion to complete..."
+while kubectl get namespace "$NAMESPACE" &>/dev/null; do
+  sleep 2
+done
+echo "  Namespace removed."
+
+echo ""
+echo "✅ Cluster is back to baseline!"
+echo ""
+echo "   Safe to move to next problem. 🚀"
+echo ""
+```
 
 </details>
 
