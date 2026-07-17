@@ -1,4 +1,4 @@
-## 🧩 Problem Statement
+# 🧩 Problem Statement (Container SecurityContext)
 
 <details>
 <summary>Click to expand the problem statement</summary>
@@ -19,27 +19,55 @@ The manifest file for `api-broker` can be found at `/ckad/secure-zone-ops/api-br
 
 ---
 
-## 🛠 Setup Practice Scenario
+# 🛠 Setup Practice Scenario
 
 <details>
 <summary>Click to expand setup steps</summary>
 
-**Step 1: Create namespace and directory**
+| Script | Purpose |
+|--------|---------|
+| `setup_q16_problem_scenario.sh` | Deploys `api-broker` with no securityContext set — run before practice (re-run anytime to practice again) |
+
+---
+
+### 📥 Script : setup_q16_problem_scenario.sh
+
+Run this **before you start practicing** this problem.
+Re-run anytime you want to practice again after fixing.
 
 ```bash
-kubectl create namespace secure-zone
-mkdir -p /ckad/secure-zone-ops
-```
+#!/bin/bash
+# ============================================================
+# CKAD Practice | Q16: Container SecurityContext
+# setup_q16_problem_scenario.sh
+# Deploys api-broker with no securityContext set
+# Run on: controlplane node
+# ============================================================
 
-**Step 2: Create the Deployment manifest without security context**
+set -euo pipefail
 
-```bash
-cat <<EOF > /ckad/secure-zone-ops/api-broker.yaml
+NAMESPACE="secure-zone"
+MANIFEST_DIR="/ckad/secure-zone-ops"
+
+echo ""
+echo "==========================================="
+echo " CKAD Q16 — Setting up SecurityContext scenario..."
+echo "==========================================="
+echo ""
+
+# ── Step 0: Revert solution-specific changes (fast) ────────────
+# Only undoes what THIS question's solution changes: the
+# api-broker manifest file (solution adds securityContext).
+echo "[0/3] Reverting any previous solution changes..."
+sudo mkdir -p "$MANIFEST_DIR"
+sudo chown "$(id -u):$(id -g)" "$MANIFEST_DIR"
+
+cat <<EOF > "$MANIFEST_DIR/api-broker.yaml"
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: api-broker
-  namespace: secure-zone
+  namespace: $NAMESPACE
 spec:
   replicas: 1
   selector:
@@ -52,36 +80,52 @@ spec:
     spec:
       containers:
       - name: api-broker
-        image: devopstechtales/ckad-exam-questions:1.12.7
+        image: devopstechtales/ckad-exam-questions:1.15.7
         command:
         - sh
         - -c
         - while true; do echo 'Broker Running'; sleep 10; done
 EOF
+
+if kubectl get namespace "$NAMESPACE" &>/dev/null; then
+  kubectl apply -f "$MANIFEST_DIR/api-broker.yaml"
+  sleep 5
+fi
+echo "  Reverted to no-securityContext state."
+
+# ── Step 1: Create the namespace ───────────────────────────────
+echo "[1/3] Ensuring namespace '$NAMESPACE' exists..."
+kubectl create namespace "$NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
+echo "  Namespace ready."
+
+# ── Step 2: Apply the Deployment ────────────────────────────────
+echo "[2/3] Applying api-broker Deployment..."
+kubectl apply -f "$MANIFEST_DIR/api-broker.yaml"
+sleep 5
+echo "  Waiting for pod to be Ready..."
+kubectl wait --for=condition=ready pod -l app=api-broker -n "$NAMESPACE" --timeout=120s
+echo "  Pod Ready."
+
+# ── Step 3: Verify no securityContext configured yet ────────────
+echo "[3/3] Verifying resources..."
+kubectl get deployment api-broker -n "$NAMESPACE"
+echo "  SecurityContext check (should be empty):"
+kubectl describe deployment api-broker -n "$NAMESPACE" | grep -A5 "Security" || echo "  (none configured, as expected)"
+
+echo ""
+echo "✅ Q16 scenario is ready!"
+echo ""
+echo "   api-broker is running with no securityContext set."
+echo "   Manifest at: $MANIFEST_DIR/api-broker.yaml"
+echo "   Now go fix it! 💪"
+echo ""
 ```
-
-**Step 3: Apply the manifest**
-
-```bash
-kubectl apply -f /ckad/secure-zone-ops/api-broker.yaml
-```
-
-**Step 4: Verify — no security context configured yet**
-
-```bash
-kubectl get deployment api-broker -n secure-zone
-kubectl describe deployment api-broker -n secure-zone | grep -A5 "Security"
-```
-
-Output should show no security context. ✅
-
-Scenario is ready. ✅
 
 </details>
 
 ---
 
-## ✅ Solution
+# ✅ Solution
 
 <details>
 <summary>Click to expand the solution</summary>
@@ -134,7 +178,7 @@ spec:
     spec:
       containers:
       - name: api-broker
-        image: devopstechtales/ckad-exam-questions:1.15.7
+        image: devopstechtales/ckad-exam-questions:1.12.7
         command:
         - sh
         - -c
@@ -200,8 +244,64 @@ uid=30000 gid=0(root) groups=0(root)
 ✅ Privilege escalation disabled
 ✅ NET_BIND_SERVICE capability added
 
-
 > `capabilities` and `allowPrivilegeEscalation` are **container level ONLY** — never pod level! Important for exam! 💪
+
+</details>
+
+---
+
+# ↩️ Restore Cluster State
+
+<details>
+<summary>Click to expand setup steps</summary>
+
+| Script | Purpose |
+|--------|---------|
+| `reset_q16_baseline.sh` | Moving to next problem? Run this to remove all Q16 changes and restore clean cluster state |
+
+---
+
+### 🧹 Script : reset_q16_baseline.sh
+
+**Done with this problem? Moving to the next one?**
+Run this to remove all Q16 changes and restore a clean cluster state.
+
+```bash
+#!/bin/bash
+# ============================================================
+# CKAD Practice | Q16: Container SecurityContext
+# reset_q16_baseline.sh
+# ============================================================
+
+set -euo pipefail
+
+NAMESPACE="secure-zone"
+MANIFEST_DIR="/ckad/secure-zone-ops"
+
+echo ""
+echo "==========================================="
+echo " CKAD Q16 — Restoring cluster to baseline..."
+echo "==========================================="
+echo ""
+
+echo "[1/2] Deleting namespace '$NAMESPACE' (Deployment)..."
+kubectl delete namespace "$NAMESPACE" --ignore-not-found
+echo "  Waiting for namespace deletion to complete..."
+while kubectl get namespace "$NAMESPACE" &>/dev/null; do
+  sleep 2
+done
+echo "  Namespace removed."
+
+echo "[2/2] Removing manifest directory..."
+sudo rm -rf "$MANIFEST_DIR"
+echo "  Manifest directory removed."
+
+echo ""
+echo "✅ Cluster is back to baseline!"
+echo ""
+echo "   Safe to move to next problem. 🚀"
+echo ""
+```
 
 </details>
 
