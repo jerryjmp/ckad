@@ -10,13 +10,13 @@ A Deployment requires specific RBAC permissions to function correctly.
 
 **Task:**
 
-1. Identify the **RBAC permissions** required by the Deployment `monitor` running in the namespace `blue-falcon`.
+1. Identify the **RBAC permissions** required by the Deployment `scraper` running in the namespace `cute-panda`.
 
-2. Create a new **ServiceAccount** named `monitor` in the namespace `blue-falcon`.
+2. Create a new **ServiceAccount** named `scraper` in the namespace `cute-panda`.
 
-3. Check the **existing Roles** in the namespace `blue-falcon` and bind the **most appropriate Role** to the new ServiceAccount `monitor`.
+3. Check the **existing Roles** in the namespace `cute-panda` and bind the **most appropriate Role** to the new ServiceAccount `scraper`.
 
-4. Update the Deployment `monitor` to use the new ServiceAccount `monitor`.
+4. Update the Deployment `scraper` to use the new ServiceAccount `scraper`.
 
 </details>
 
@@ -29,7 +29,7 @@ A Deployment requires specific RBAC permissions to function correctly.
 
 | Script | Purpose |
 |--------|---------|
-| `setup_q07_problem_scenario.sh` | Deploys namespace, 3 Roles, and the `monitor` Deployment on the `default` ServiceAccount — run before practice (re-run anytime to practice again) |
+| `setup_q07_problem_scenario.sh` | Deploys namespace, 3 Roles, and the `scraper` Deployment on the `default` ServiceAccount — run before practice (re-run anytime to practice again) |
 
 ---
 
@@ -43,13 +43,13 @@ Re-run anytime you want to practice again after fixing.
 # ============================================================
 # CKAD Practice | Q07: RBAC - ServiceAccount & Role Binding
 # setup_q07_problem_scenario.sh
-# Deploys 3 Roles + monitor Deployment on default ServiceAccount
+# Deploys 3 Roles + scraper Deployment on default ServiceAccount
 # Run on: controlplane node
 # ============================================================
 
 set -euo pipefail
 
-NAMESPACE="blue-falcon"
+NAMESPACE="cute-panda"
 
 echo ""
 echo "==========================================="
@@ -59,16 +59,16 @@ echo ""
 
 # ── Step 0: Revert solution-specific changes (fast) ────────────
 # Only undoes what THIS question's solution creates/changes:
-# - ServiceAccount monitor
-# - RoleBinding monitor-binding
+# - ServiceAccount scraper
+# - RoleBinding scraper-binding
 # - Deployment's serviceAccountName (patched back to default)
 # The 3 Roles and the Deployment itself are untouched by the
 # solution, so they don't need to be recreated.
 echo "[0/4] Reverting any previous solution changes..."
-kubectl delete rolebinding monitor-binding -n "$NAMESPACE" --ignore-not-found
-kubectl delete serviceaccount monitor -n "$NAMESPACE" --ignore-not-found
-if kubectl get deployment monitor -n "$NAMESPACE" &>/dev/null; then
-  kubectl patch deployment monitor -n "$NAMESPACE" \
+kubectl delete rolebinding scraper-binding -n "$NAMESPACE" --ignore-not-found
+kubectl delete serviceaccount scraper -n "$NAMESPACE" --ignore-not-found
+if kubectl get deployment scraper -n "$NAMESPACE" &>/dev/null; then
+  kubectl patch deployment scraper -n "$NAMESPACE" \
     --type='json' -p='[{"op":"replace","path":"/spec/template/spec/serviceAccountName","value":"default"}]' 2>/dev/null || true
 fi
 echo "  Reverted."
@@ -115,51 +115,51 @@ EOF
 echo "  Roles created."
 
 # ── Step 3: Create the Deployment on the default ServiceAccount ──
-echo "[3/4] Creating monitor Deployment (uses default ServiceAccount)..."
+echo "[3/4] Creating scraper Deployment (uses default ServiceAccount)..."
 
 kubectl apply -f - <<EOF
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: monitor
+  name: scraper
   namespace: $NAMESPACE
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: monitor
+      app: scraper
   template:
     metadata:
       labels:
-        app: monitor
+        app: scraper
     spec:
       containers:
-      - name: monitor
+      - name: scraper
         image: bitnami/kubectl:latest
         command:
         - sh
         - -c
         - |
           while true; do
-            kubectl get pods -n blue-falcon
+            kubectl get pods -n cute-panda
             sleep 10
           done
 EOF
 
 echo "  Waiting for pod to be Ready..."
-kubectl wait --for=condition=ready pod -l app=monitor -n "$NAMESPACE" --timeout=120s
+kubectl wait --for=condition=ready pod -l app=scraper -n "$NAMESPACE" --timeout=120s
 echo "  Pod Ready."
 
 # ── Step 4: Verify scenario is broken ──────────────────────────
 echo "[4/4] Verifying deployment logs (expect Forbidden error)..."
 kubectl get all -n "$NAMESPACE"
 sleep 3
-kubectl logs -n "$NAMESPACE" deploy/monitor --tail=5 || true
+kubectl logs -n "$NAMESPACE" deploy/scraper --tail=5 || true
 
 echo ""
 echo "✅ Q07 scenario is ready!"
 echo ""
-echo "   monitor Deployment is running but its default ServiceAccount"
+echo "   scraper Deployment is running but its default ServiceAccount"
 echo "   lacks permission to list pods. 3 Roles exist — only one fits."
 echo "   Now go fix it! 💪"
 echo ""
@@ -179,14 +179,14 @@ echo ""
 ### Step 1: Check deployment logs to identify required permission
 
 ```bash
-kubectl logs -n blue-falcon deploy/monitor
+kubectl logs -n cute-panda deploy/scraper
 ```
 
 Output:
 ```
 Error from server (Forbidden): pods is forbidden: User 
-"system:serviceaccount:blue-falcon:default" cannot list resource 
-"pods" in API group "" in the namespace "blue-falcon"
+"system:serviceaccount:cute-panda:default" cannot list resource 
+"pods" in API group "" in the namespace "cute-panda"
 ```
 
 This tells us:
@@ -199,13 +199,13 @@ This tells us:
 ### Step 2: Create new ServiceAccount
 
 ```bash
-kubectl create serviceaccount monitor -n blue-falcon
+kubectl create serviceaccount scraper -n cute-panda
 ```
 
 **Verify:**
 
 ```bash
-kubectl get serviceaccount -n blue-falcon
+kubectl get serviceaccount -n cute-panda
 ```
 
 ---
@@ -213,7 +213,7 @@ kubectl get serviceaccount -n blue-falcon
 ### Step 3: List existing Roles
 
 ```bash
-kubectl get roles -n blue-falcon
+kubectl get roles -n cute-panda
 ```
 
 Output:
@@ -227,7 +227,7 @@ pod-logs       2026-01-01T00:00:00Z
 **Describe each Role to find the correct one:**
 
 ```bash
-kubectl describe role event-reader -n blue-falcon
+kubectl describe role event-reader -n cute-panda
 ```
 ```
 Resources  Verbs
@@ -236,7 +236,7 @@ events     get, list       ← events, not pods
 ```
 
 ```bash
-kubectl describe role pod-logs -n blue-falcon
+kubectl describe role pod-logs -n cute-panda
 ```
 ```
 Resources  Verbs
@@ -245,7 +245,7 @@ pods/log   get             ← logs only, not list pods
 ```
 
 ```bash
-kubectl describe role pod-list -n blue-falcon
+kubectl describe role pod-list -n cute-panda
 ```
 ```
 Resources  Verbs
@@ -257,20 +257,20 @@ pods       get, list       ✅ this is what we need!
 
 ---
 
-### Step 4: Bind pod-list Role to monitor ServiceAccount
+### Step 4: Bind pod-list Role to scraper ServiceAccount
 
 ```bash
-kubectl create rolebinding monitor-binding \
+kubectl create rolebinding scraper-binding \
   --role=pod-list \
-  --serviceaccount=blue-falcon:monitor \
-  --namespace=blue-falcon
+  --serviceaccount=cute-panda:scraper \
+  --namespace=cute-panda
 ```
 
 **Verify:**
 
 ```bash
-kubectl get rolebinding -n blue-falcon
-kubectl describe rolebinding monitor-binding -n blue-falcon
+kubectl get rolebinding -n cute-panda
+kubectl describe rolebinding scraper-binding -n cute-panda
 ```
 
 ---
@@ -278,20 +278,20 @@ kubectl describe rolebinding monitor-binding -n blue-falcon
 ### Step 5: Update Deployment to use new ServiceAccount
 
 ```bash
-kubectl set serviceaccount deployment/monitor monitor -n blue-falcon
+kubectl set serviceaccount deployment/scraper scraper -n cute-panda
 ```
 
 Or edit manually:
 
 ```bash
-kubectl edit deployment monitor -n blue-falcon
+kubectl edit deployment scraper -n cute-panda
 ```
 
 ```yaml
 spec:
   template:
     spec:
-      serviceAccountName: monitor    # ✅ add this line
+      serviceAccountName: scraper    # ✅ add this line
 ```
 
 ---
@@ -299,7 +299,7 @@ spec:
 ### Step 6: Verify rollout completed
 
 ```bash
-kubectl rollout status deployment/monitor -n blue-falcon
+kubectl rollout status deployment/scraper -n cute-panda
 ```
 
 ---
@@ -307,7 +307,7 @@ kubectl rollout status deployment/monitor -n blue-falcon
 ### Step 7: Check logs — error should be gone
 
 ```bash
-kubectl logs -n blue-falcon deploy/monitor
+kubectl logs -n cute-panda deploy/scraper
 ```
 
 Expected output:
@@ -344,7 +344,7 @@ Run this to remove all Q07 changes and restore a clean cluster state.
 
 set -euo pipefail
 
-NAMESPACE="blue-falcon"
+NAMESPACE="cute-panda"
 
 echo ""
 echo "==========================================="
