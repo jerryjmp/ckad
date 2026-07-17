@@ -1,7 +1,4 @@
-## 📄 CKAD Question 2 — Modify Container Name and Image
-
-
-### 🧩 Problem Statement
+# 🧩 Problem Statement (Modify Container Name and Image on a Paused Deployment)
 
 <details>
 <summary>Click to expand the problem statement</summary>
@@ -20,26 +17,69 @@ Update the existing Deployment `alpine-runner` running in the namespace `rapid-f
 
 ---
 
-### 🛠 Setup Practice Scenario
+# 🛠 Setup Practice Scenario
 
 <details>
 <summary>Click to expand setup steps</summary>
 
-**Step 1: Create the namespace**
+| Script | Purpose |
+|--------|---------|
+| `setup_q17_problem_scenario.sh` | Deploys `alpine-runner` (container `fun`, image `:fun`) and pauses it — run before practice (re-run anytime to practice again) |
+
+---
+
+### 📥 Script : setup_q17_problem_scenario.sh
+
+Run this **before you start practicing** this problem.
+Re-run anytime you want to practice again after fixing.
 
 ```bash
-kubectl create namespace rapid-fire
-```
+#!/bin/bash
+# ============================================================
+# CKAD Practice | Q17: Modify Container Name and Image (Paused Deployment)
+# setup_q17_problem_scenario.sh
+# Deploys alpine-runner (container "fun", image ":fun"), then
+# pauses the Deployment to simulate the exam condition
+# Run on: controlplane node
+# ============================================================
 
-**Step 2: Create the Deployment**
+set -euo pipefail
 
-```bash
-cat <<EOF | kubectl apply -f -
+NAMESPACE="rapid-fire"
+DEPLOYMENT="alpine-runner"
+
+echo ""
+echo "==========================================="
+echo " CKAD Q17 — Setting up Paused Deployment scenario..."
+echo "==========================================="
+echo ""
+
+# ── Step 0: Revert solution-specific changes (fast) ────────────
+# Only undoes what THIS question's solution changes:
+# - container name (core → back to fun)
+# - container image (:core → back to :fun)
+# - paused field (false → back to true)
+# Re-applying the original Deployment below handles the container
+# name/image revert; the paused patch is re-applied separately
+# since `paused` lives outside the pod template and isn't touched
+# by a template-only apply.
+echo "[0/1] Reverting any previous solution changes..."
+echo "  (handled by Steps 1–3 below — apply + re-pause)"
+
+# ── Step 1: Create the namespace ───────────────────────────────
+echo "[1/3] Ensuring namespace '$NAMESPACE' exists..."
+kubectl create namespace "$NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
+echo "  Namespace ready."
+
+# ── Step 2: Create/reset the Deployment (container: fun, image: :fun) ──
+echo "[2/3] Applying $DEPLOYMENT (container 'fun', image ':fun')..."
+
+kubectl apply -f - <<EOF
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: alpine-runner
-  namespace: rapid-fire
+  name: $DEPLOYMENT
+  namespace: $NAMESPACE
 spec:
   replicas: 1
   selector:
@@ -59,29 +99,34 @@ spec:
         - while true; do echo 'Container Running'; sleep 600; done
         imagePullPolicy: IfNotPresent
 EOF
-```
 
-**Step 3: Add paused: true to simulate exam condition**
+sleep 5
+echo "  Waiting for pod to be Ready..."
+kubectl wait --for=condition=ready pod -l app=alpine-runner -n "$NAMESPACE" --timeout=120s
+echo "  Pod Ready."
 
-```bash
-kubectl patch deployment alpine-runner -n rapid-fire \
+# ── Step 3: Pause the Deployment to simulate exam condition ────
+echo "[3/3] Pausing $DEPLOYMENT..."
+kubectl patch deployment "$DEPLOYMENT" -n "$NAMESPACE" \
   -p '{"spec":{"paused": true}}'
+
+echo "  Verifying..."
+kubectl get deployment "$DEPLOYMENT" -n "$NAMESPACE"
+kubectl get deployment "$DEPLOYMENT" -n "$NAMESPACE" -o jsonpath='{.spec.paused}{"\n"}'
+
+echo ""
+echo "✅ Q17 scenario is ready!"
+echo ""
+echo "   $DEPLOYMENT is running (container: fun, image: :fun) and PAUSED."
+echo "   Now go fix it! 💪"
+echo ""
 ```
-
-**Step 4: Verify**
-
-```bash
-kubectl get deployment alpine-runner -n rapid-fire
-kubectl describe deployment alpine-runner -n rapid-fire
-```
-
-Scenario is ready. ✅
 
 </details>
 
 ---
 
-### ✅ Solution
+# ✅ Solution
 
 <details>
 <summary>Click to expand the solution</summary>
@@ -162,6 +207,58 @@ kubectl get deployment alpine-runner -n rapid-fire -o jsonpath=\
 ```bash
 kubectl get deployment alpine-runner -n rapid-fire -o jsonpath=\
 '{.spec.template.spec.containers[*].image}'
+```
+
+</details>
+
+---
+
+# ↩️ Restore Cluster State
+
+<details>
+<summary>Click to expand setup steps</summary>
+
+| Script | Purpose |
+|--------|---------|
+| `reset_q17_baseline.sh` | Moving to next problem? Run this to remove all Q17 changes and restore clean cluster state |
+
+---
+
+### 🧹 Script : reset_q17_baseline.sh
+
+**Done with this problem? Moving to the next one?**
+Run this to remove all Q17 changes and restore a clean cluster state.
+
+```bash
+#!/bin/bash
+# ============================================================
+# CKAD Practice | Q17: Modify Container Name and Image (Paused Deployment)
+# reset_q17_baseline.sh
+# ============================================================
+
+set -euo pipefail
+
+NAMESPACE="rapid-fire"
+
+echo ""
+echo "==========================================="
+echo " CKAD Q17 — Restoring cluster to baseline..."
+echo "==========================================="
+echo ""
+
+echo "[1/1] Deleting namespace '$NAMESPACE' (Deployment)..."
+kubectl delete namespace "$NAMESPACE" --ignore-not-found
+echo "  Waiting for namespace deletion to complete..."
+while kubectl get namespace "$NAMESPACE" &>/dev/null; do
+  sleep 2
+done
+echo "  Namespace removed."
+
+echo ""
+echo "✅ Cluster is back to baseline!"
+echo ""
+echo "   Safe to move to next problem. 🚀"
+echo ""
 ```
 
 </details>
