@@ -29,11 +29,11 @@ A Deployment requires specific RBAC permissions to function correctly.
 
 | Script | Purpose |
 |--------|---------|
-| `setup_q07_problem_scenario.sh` | Deploys namespace, 3 Roles, and the `scraper` Deployment on the `default` ServiceAccount — run before practice (re-run anytime to practice again) |
+| `setup_q03_problem_scenario.sh` | Deploys namespace, 3 Roles, and the `scraper` Deployment on the `default` ServiceAccount — run before practice (re-run anytime to practice again) |
 
 ---
 
-### 📥 Script : setup_q07_problem_scenario.sh
+### 📥 Script : setup_q03_problem_scenario.sh
 
 Run this **before you start practicing** this problem.
 Re-run anytime you want to practice again after fixing.
@@ -41,8 +41,8 @@ Re-run anytime you want to practice again after fixing.
 ```bash
 #!/bin/bash
 # ============================================================
-# CKAD Practice | Q07: RBAC - ServiceAccount & Role Binding
-# setup_q07_problem_scenario.sh
+# CKAD Practice | Q03: RBAC - ServiceAccount & Role Binding
+# setup_q03_problem_scenario.sh
 # Deploys 3 Roles + scraper Deployment on default ServiceAccount
 # Run on: controlplane node
 # ============================================================
@@ -53,7 +53,7 @@ NAMESPACE="cute-panda"
 
 echo ""
 echo "==========================================="
-echo " CKAD Q07 — Setting up RBAC scenario..."
+echo " CKAD Q03 — Setting up RBAC scenario..."
 echo "==========================================="
 echo ""
 
@@ -157,7 +157,7 @@ sleep 3
 kubectl logs -n "$NAMESPACE" deploy/scraper --tail=5 || true
 
 echo ""
-echo "✅ Q07 scenario is ready!"
+echo "✅ Q03 scenario is ready!"
 echo ""
 echo "   scraper Deployment is running but its default ServiceAccount"
 echo "   lacks permission to list pods. 3 Roles exist — only one fits."
@@ -326,20 +326,20 @@ Successfully listed pods ✅
 
 | Script | Purpose |
 |--------|---------|
-| `reset_q07_baseline.sh` | Moving to next problem? Run this to remove all Q07 changes and restore clean cluster state |
+| `reset_q03_baseline.sh` | Moving to next problem? Run this to remove all Q03 changes and restore clean cluster state |
 
 ---
 
-### 🧹 Script : reset_q07_baseline.sh
+### 🧹 Script : reset_q03_baseline.sh
 
 **Done with this problem? Moving to the next one?**
-Run this to remove all Q07 changes and restore a clean cluster state.
+Run this to remove all Q03 changes and restore a clean cluster state.
 
 ```bash
 #!/bin/bash
 # ============================================================
-# CKAD Practice | Q07: RBAC - ServiceAccount & Role Binding
-# reset_q07_baseline.sh
+# CKAD Practice | Q03: RBAC - ServiceAccount & Role Binding
+# reset_q03_baseline.sh
 # ============================================================
 
 set -euo pipefail
@@ -348,7 +348,7 @@ NAMESPACE="cute-panda"
 
 echo ""
 echo "==========================================="
-echo " CKAD Q07 — Restoring cluster to baseline..."
+echo " CKAD Q03 — Restoring cluster to baseline..."
 echo "==========================================="
 echo ""
 
