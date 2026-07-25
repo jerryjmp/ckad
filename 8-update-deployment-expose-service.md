@@ -11,7 +11,7 @@ A Kubernetes cluster is already configured. You must connect to the **correct co
    - Scale it to run **3 Pod replicas**
    - Add the label `tier: proxy` to the **Pods**
 
-2. Create a **NodePort Service** named `gateway` in the namespace `app-team` to expose the Deployment `web-frontend` on TCP port `80`
+2. Create a **NodePort Service** named `gateway` in the namespace `app-team` to expose the Deployment `web-frontend` on TCP port `81`
 
 </details>
 
